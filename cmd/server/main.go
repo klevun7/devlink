@@ -1,35 +1,53 @@
 package main
 import (
-	"context"
-	"database/sql"
-	"encoding/json"
-	"fmt"
+	"devlink/internal/database"
+	"devlink/internal/email"
+	"devlink/internal/api"
 	"log"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 )
-
-var (
-	apiSecret string
-	sesClient *ses.Client
-	db *sql.DB
-)
-
 func main() {
-	apiSecret = os.Getenv("API_SECRET")
+	apiSecret := os.Getenv("API_SECRET")
 	if apiSecret == "" {
-		log.Fatal("API_SECRET environment variable is required, check file for valid key")
+		log.Fatal("API_SECRET environment variable is required")
 	}
 	var err error
-	db, err = sql.Open("sqlite3", "./data/devlink.db")
+	db, err := database.New("./data/devlink.db")
 	if err != nil{
 		log.Fatal(err)
 	}
 	defer db.Close()
 	
-	initDB()
-}
+	emailService, err := email.NewService(
+		os.Getenv("AWS_REGION"),
+		os.Getenv("AWS_ACCESS_KEY_ID"),
+		os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		os.Getenv("SES_SENDER"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-func initDB() {}
+	server := &api.Server{
+		Store: db,
+		Email: emailService,
+		APISecret: apiSecret,
+	}
+
+	// Routes
+	http.Handle("/", http.FileServer(http.Dir("./public")))
+	http.HandleFunc("api/ingest", server.IngestJobsHandler)
+	http.HandleFunc("api/subscribe", server.SubscribeHandler)
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("Starting Devlink Backend on port %s...", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
+}

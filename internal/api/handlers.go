@@ -32,7 +32,7 @@ func (s *Server) IngestJobsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var newJobs []models.Job
 	for _, job := range req.Jobs {
-		inserted, err := s.Store.SaveJob(r.Context(), job)
+		inserted, err := s.Store.SaveJob(job)
 		if err != nil && inserted {
 			newJobs = append(newJobs, job)
 		}
