@@ -1,0 +1,19 @@
+services:
+  app:
+    container_name: devlink_backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    networks:
+      - devlink-net
+
+networks:
+  devlink-net:
+    driver: bridge
