@@ -1,19 +1,44 @@
 services:
-  app:
-    container_name: devlink_backend
+  db:
+    image: postgres:15-alpine
+    container_name: devlink-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
     build:
       context: .
-      dockerfile: Dockerfile
-    restart: always
+      dockerfile: api/Dockerfile
+    container_name: devlink-api
+    depends_on:
+      - db
     ports:
       - "8080:8080"
-    volumes:
-      - ./data:/app/data
-    env_file:
-      - .env
-    networks:
-      - devlink-net
+    environment:
+      DB_HOST: db
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
-networks:
-  devlink-net:
-    driver: bridge
+  scraper:
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    container_name: devlink-scraper
+    depends_on:
+      - api
+    environment:
+      API_URL: "http://api:8080/jobs"
+
+volumes:
+  postgres_data:
