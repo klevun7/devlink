@@ -2,6 +2,12 @@ import requests
 from bs4 import BeautifulSoup
 
 def scrape_simplify_repo(repo_url):
+<<<<<<< HEAD
+=======
+    """
+    Scrapes job tables from SimplifyJobs-style GitHub repositories.
+    """
+>>>>>>> fb3e5d249783e4b168e22c0761f6d9b8fa143afb
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
