@@ -1,5 +1,48 @@
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+import re
+
+def parse_github_date(date_str):
+
+    today = datetime.now()
+    clean_str = re.sub(r'[^a-zA-Z0-9 ]', '', date_str).strip().lower()
+
+    try:
+        # CASE 1: Relative "Months" (e.g., "1mo")
+        if 'mo' in clean_str:
+            match = re.search(r'\d+', clean_str)
+            if match:
+                num = int(match.group())
+                return today - timedelta(days=num * 30)
+
+        # CASE 2: Relative "Days" (e.g., "5d")
+        elif 'd' in clean_str and 'm' not in clean_str:
+            match = re.search(r'\d+', clean_str)
+            if match:
+                num = int(match.group())
+                return today - timedelta(days=num)
+
+        # CASE 3: Relative "Hours" (e.g., "12h")
+        elif 'h' in clean_str:
+            return today 
+
+        # CASE 4: Standard "Jan 20"
+        else:
+            current_year = today.year
+            clean_str = clean_str.title() 
+            if len(clean_str) < 3: return None
+            
+            date_obj = datetime.strptime(f"{clean_str} {current_year}", "%b %d %Y")
+            
+            if date_obj > today + timedelta(days=5):
+                 date_obj = date_obj.replace(year=current_year - 1)
+            return date_obj
+
+    except Exception:
+        return None
+    
+    return None
 
 def scrape_simplify_repo(repo_url):
     headers = {
@@ -9,63 +52,66 @@ def scrape_simplify_repo(repo_url):
     jobs_found = []
     
     try:
-        print(f"Checking {repo_url}...")
         response = requests.get(repo_url, headers=headers)
-        if response.status_code != 200:
-            print(f"Failed to fetch {repo_url}: {response.status_code}")
-            return []
-
         soup = BeautifulSoup(response.text, "html.parser")
         
-    
         tables = soup.find_all("table")
-        
         target_table = None
+        
         for table in tables:
-            headers_text = [th.get_text(strip=True).lower() for th in table.find_all("th")]
-            if "company" in headers_text and "role" in headers_text:
+            headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
+            if "company" in headers:
                 target_table = table
                 break
         
         if not target_table:
-            print(f"No job table found in {repo_url}")
+            print("[ERROR] No Job Table found.")
             return []
 
-        
         rows = target_table.find_all("tr")[1:] 
+        today = datetime.now()
         
+        last_company = "Unknown"
+
         for row in rows:
             cols = row.find_all("td")
-            if len(cols) < 3:
-                continue
+            if len(cols) < 4: continue
 
-            company = cols[0].get_text(strip=True)
-            role = cols[1].get_text(strip=True)
+            raw_company = cols[0].get_text(strip=True)
+            if "↳" in raw_company or not raw_company:
+                company_name = last_company
+            else:
+                company_name = raw_company
+                last_company = raw_company
+
+            role_name = cols[1].get_text(strip=True)
             location = cols[2].get_text(strip=True)
-        
-            link_elem = None
-        
-            if len(cols) >= 4:
-                link_elem = cols[3].find("a")
-    
-            if not link_elem:
-                link_elem = cols[1].find("a")
+            
 
-            if link_elem and link_elem.get("href"):
-                raw_url = link_elem["href"]
+            date_str = cols[-1].get_text(strip=True)
+            job_date = parse_github_date(date_str)
+
+            if job_date:
+                days_old = (today - job_date).days
                 
-       
-                if "github.com" in raw_url and "SimplifyJobs" in raw_url:
+                if days_old > 5:
                     continue 
 
-                jobs_found.append({
-                    "title": role,
-                    "company": company,
-                    "location": location,
-                    "url": raw_url
-                })
+                link_elem = None
+                if len(cols) >= 4: link_elem = cols[3].find("a")
+                if not link_elem: link_elem = cols[1].find("a")
+
+                if link_elem:
+                    jobs_found.append({
+                        "title": role_name,
+                        "company": company_name,
+                        "location": location,
+                        "url": link_elem['href'],
+                        "posted_date": date_str
+                    })
+                    print(f"   [FOUND] {company_name} ({date_str})")
 
     except Exception as e:
-        print(f"Error scraping {repo_url}: {e}")
+        print(f"[ERROR] Scraper failed: {e}")
 
     return jobs_found
