@@ -37,16 +37,15 @@ func SendDailySummary(jobs []EmailJob) {
 	client := sesv2.NewFromConfig(cfg)
 	subject := fmt.Sprintf("Daily Job Summary: %d New Roles", len(jobs))
 
-	// --- BUILD HTML BODY ---
+
 	var sb strings.Builder
 	
-	// CSS Styling
 	sb.WriteString("<html><body style='font-family: Arial, sans-serif;'>")
 	sb.WriteString("<h2>Good Morning!</h2>")
 	sb.WriteString(fmt.Sprintf("<p>We found <b>%d new jobs</b> matching your criteria in the last 24 hours.</p>", len(jobs)))
 	sb.WriteString("<hr style='border: 0; border-top: 1px solid #eee;'>")
 	
-	// Job List
+
 	sb.WriteString("<ul style='padding-left: 0; list-style-type: none;'>")
 	for _, job := range jobs {
 		sb.WriteString("<li style='margin-bottom: 20px; padding: 10px; background-color: #f9f9f9; border-radius: 5px;'>")
